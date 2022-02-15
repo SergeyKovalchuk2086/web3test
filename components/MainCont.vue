@@ -1,11 +1,8 @@
 <template>
-  <div>
+  <div v-if="isConnectedNode">
     <header class="header">
       <div class="header__button">
-        <button v-if="connected" class="button" @click="disconnect">
-          Disconnect Wallet
-        </button>
-        <button v-else class="button" @click="connect">
+        <button class="button" @click="connect">
           Connect Wallet
         </button>
       </div>
@@ -34,7 +31,6 @@
             </select>
           </div>
         </div>
-
           <div class="address">
             <div class="address__field">
               <label for="address" class="address__text">Address</label>
@@ -48,30 +44,24 @@
               </ValidationProvider>
             </div>
           </div>
-
         <div class="balance">
-          Your balance : {{selectedSymbol.balance ? selectedSymbol.balance : '-' }} {{selectedSymbol.symbol}}
+          Your balance : {{balanceToken ? balanceToken : '-' }} {{selectedSymbol.symbol}}
         </div>
-
         <div class="allowance" >
           Your allowance : {{tokenAllowance ? tokenAllowance : '-'}}
         </div>
-
         <div class="buttons">
           <button class="buttons__allow btn"  @click="allowance(selectedSymbol)">
             Get allowance
           </button>
-
           <button class="buttons__approve btn" :disabled='invalid' @click="approve(selectedSymbol)">
             Approve
           </button>
-
           <button class="buttons__transfer btn" :disabled='invalid' @click="transfer(selectedSymbol)">
             Transfer
           </button>
         </div>
       </ValidationObserver>
-
       <Transactions />
       <wrong-network  v-if="wrongNetworkInWallet" @close-modal="closeModal"/>
     </main>
@@ -79,7 +69,9 @@
 </template>
 
 <script>
+import BigNumber from "bignumber.js";
 import Transactions from "./Transactions";
+import WrongNetwork from "../modals/WrongNetwork";
 import {
   connectNode,
   fetchContractData,
@@ -88,10 +80,7 @@ import {
   approveToken,
   getTransaction
 } from "../core/web3";
-import BigNumber from "bignumber.js";
-import WrongNetwork from "../modals/WrongNetwork";
-const { ERC20 } = require('../core/abis');
-
+import {ERC20} from "../core/abis";
 
 export default {
   name: 'MainCont',
@@ -103,14 +92,17 @@ export default {
       amountToken: null,
       recipientAddress: '',
       connected: null,
-      allTransactions: []
+      allTransactions: [],
+      isConnectedNode: false,
+      balanceToken: null
     }
   },
   watch: {
     connected(value){
-      if(value) this.getAllTransactions();
+      if(value) this.getAllTransactions()
     },
     selectedSymbol(value){
+      this.balance(value)
       this.getAllTransactions(value)
     }
   },
@@ -119,65 +111,55 @@ export default {
       return this.$store.getters.getCurrentNetwork
     },
     wrongNetworkInWallet(){
-      return this.$store.getters.wrongNetworkStatus
+      return this.$store.getters.getWrongNetworkStatus
     },
     tokensInfo(){
       return this.$store.getters.getTokensInfo
-    }
+    },
   },
   methods: {
     //подключить кошелек
     connect(){
-      this.$store.dispatch('CONNECT_WALLET')
+      this.$store.dispatch('connectWallet')
     },
-    disconnect(){
-      this.connected = !this.connected
-    },
-
     //transfer token
     async transfer(selectedSymbol){
-      let amount;
-
-      amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString();
+      const amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString()
       await transferToken(selectedSymbol.token, this.recipientAddress, amount )
     },
-
     //approve
     async approve(selectedSymbol){
-      let amount;
-
-      amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString();
+      const amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString()
       await approveToken(selectedSymbol.token, this.recipientAddress, amount )
     },
-
     //allowance
     async allowance(selectedSymbol){
-      let allowance;
-
-      allowance = await fetchContractData('allowance', ERC20, selectedSymbol.token, [userAddress, this.recipientAddress]);
+      const allowance = await fetchContractData('allowance', ERC20, selectedSymbol.token, [userAddress, this.recipientAddress])
       this.tokenAllowance = new BigNumber(allowance).shiftedBy(-selectedSymbol.decimal).toString()
     },
+    //закрыть модалку
     closeModal() {
       this.wrongNetworkWallet = !this.wrongNetworkWallet
     },
-
+    // получить баланс по токену
+    async balance(selectedSymbol){
+      let balance = await fetchContractData('balanceOf', ERC20, selectedSymbol.token, [userAddress])
+      this.balanceToken = new BigNumber(balance).shiftedBy(-selectedSymbol.decimal).toString()
+    },
     //all transactions
     getAllTransactions(value){
-
       const _this = this
-      _this.$store.dispatch('CLEAR_TRANSACTIONS')
+      _this.$store.dispatch('clearTransactions')
 
        getTransaction(value.token,  function(trans){
-         _this.$store.dispatch('SET_TRANSACTIONS',  trans)
+         _this.$store.dispatch('setTransactions',  trans)
       });
     },
-
   },
   mounted() {
-    connectNode();
+    this.isConnectedNode = connectNode()
   },
 }
-
 </script>
 
 <style lang="scss" scoped>

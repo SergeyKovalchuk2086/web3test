@@ -2,17 +2,15 @@
   <div class="transactions">
     <p class="transactions__title">Your transactions</p>
     <div class="transactions__list">
-      <div class="transactions__item" v-for="transaction in allTransactions" :key="transaction.blockHash">
+      <div class="transactions__item" v-for="transaction in allTransactions" :key="transaction.blockNumber">
         <div class="transactions__type">
             <p>Type</p>
             <p>{{transaction.event}}</p>
         </div>
-
         <div class="transactions__from">
           <p>From</p>
           <p>{{transaction.returnValues.from}}</p>
         </div>
-
         <div class="transactions__to">
           <p>To</p>
           <p>{{transaction.returnValues.to}}</p>
@@ -28,13 +26,8 @@
 </template>
 
 <script>
-
 export default {
   name: 'Transactions',
-  data(){
-    return {
-    }
-  },
   computed: {
     allTransactions(){
       return this.$store.getters.getAllTransactions

@@ -1,100 +1,101 @@
-import {connectWallet, fetchContractData, userAddress} from "../core/web3";
-import {network} from "../core/constants";
-import {ERC20} from "../core/abis";
 import BigNumber from "bignumber.js";
+import {connectWallet, fetchContractData, userAddress} from "../core/web3";
+import {network, tokens} from "../core/constants";
+import {ERC20} from "../core/abis";
 
 export const state = () => ({
   isConnected: null,
   currentNetwork: '',
   wrongNetwork: false,
-  tokens: [
-    '0x4b107a23361770534bd1839171bbf4b0eb56485c',
-    '0xc13da4146d381c7032ca1ed6050024b4e324f4ef',
-    '0x8d0c36c8842d1dc9e49fbd31b81623c1902b7819',
-    '0xa364f66f40b8117bbdb772c13ca6a3d36fe95b13',
-    '0x59c106284a67515eDe58B7524D3eDD06C8d8479F'
-  ],
   tokensInfo: [],
   allTransactions: []
 })
 
 export const mutations = {
-  setStatusWallet(state, status) {
-    state.isConnected = status
-  },
-  setCurrentNetwork(state, network) {
+  SET_CURRENT_NETWORK(state, network) {
     state.currentNetwork = network
   },
-  wrongNetworkInWallet(state, status) {
+  SET_WRONG_NETWORK_STATUS(state, status) {
     state.wrongNetwork = status
   },
-  setTokenInfo(state, arr) {
+  SET_TOKEN_INFO(state, arr) {
     state.tokensInfo = arr
   },
-  set_transactions(state, transArr) {
+  SET_TRANSACTIONS(state, transArr) {
     state.allTransactions = [...state.allTransactions, transArr]
   },
-  clear_transactions(state){
+  CLEAR_TRANSACTIONS(state){
     state.allTransactions = []
   }
 }
 
 export const actions = {
-  SET_STATUS({commit}, status) {
-    commit('setStatusWallet', status)
-  },
-  async CONNECT_WALLET({commit, dispatch}){
+  async connectWallet({commit, dispatch}){
     const chainId = await connectWallet();
     if(chainId === 4) {
-      commit('setCurrentNetwork', network.Rinkeby)
-      dispatch('GET_ALL_INFO_ABOUT_TOKEN')
+      commit('SET_CURRENT_NETWORK', network.Rinkeby)
+      dispatch('getAllInfoAboutToken')
     } else {
       commit('setCurrentNetwork', network.Mainnet)
-      commit('wrongNetworkInWallet', true)
+      commit('SET_WRONG_NETWORK_STATUS', true)
     }
-
   },
-  async GET_ALL_INFO_ABOUT_TOKEN({commit, state}) {
-    let arrayInfo = []
+  async getAllInfoAboutToken({commit, state}) {
+    try {
+      let arrayInfo = []
+      // const [
+      //   symbolOfToken,
+      //   decimals
+      // ] = await Promise.all([
+      //   fetchContractData('symbol', ERC20, token),
+      //   await fetchContractData('decimals', ERC20, token)
+      // ])
+      //перебор токенов
+      for (const token of tokens) {
 
-    //перебор токенов
-    for (const token of state.tokens) {
+        //символ токена
+        // const symbolOfToken = await fetchContractData('symbol', ERC20, token);
 
-      //символ токена
-      const symbolOfToken = await fetchContractData('symbol', ERC20, token);
-      // console.log('symbol', symbolOfToken)
+        // точность
+        // const decimals = await fetchContractData('decimals', ERC20, token)
 
-      // точность
-      const decimals = await fetchContractData('decimals', ERC20, token)
-      // console.log(decimals)
+        // баланс
+        // let balance = await fetchContractData('balanceOf', ERC20, token, [userAddress])
+        // balance = new BigNumber(balance).shiftedBy(-decimals).toString()
 
-      // баланс
-      let balance = await fetchContractData('balanceOf', ERC20, token, [userAddress])
-      balance = new BigNumber(balance).shiftedBy(-decimals).toString()
-      // console.log(balance)
+        const [
+          symbolOfToken,
+          decimals
+        ] = await Promise.all([
+          fetchContractData('symbol', ERC20, token),
+          fetchContractData('decimals', ERC20, token)
+        ])
 
-      const tokenInfo = {
-        token: token,
-        symbol: symbolOfToken,
-        balance: balance,
-        decimal: decimals
+        const tokenInfo = {
+          token: token,
+          symbol: symbolOfToken,
+          // balance: balance,
+          decimal: decimals
+        }
+        arrayInfo.push(tokenInfo);
       }
-      arrayInfo.push(tokenInfo);
+      commit('SET_TOKEN_INFO', arrayInfo)
+    } catch (err) {
+      console.log('Get token info error')
     }
-    commit('setTokenInfo', arrayInfo)
-  },
 
-  SET_TRANSACTIONS({commit}, transArr) {
-    commit('set_transactions', transArr)
   },
-  CLEAR_TRANSACTIONS({commit}){
-    commit('clear_transactions')
-}
+  setTransactions({commit}, transArr) {
+    commit('SET_TRANSACTIONS', transArr)
+  },
+  clearTransactions({commit}){
+    commit('CLEAR_TRANSACTIONS')
+  }
 }
 
 export const getters = {
   getCurrentNetwork : state => state.currentNetwork,
-  wrongNetworkStatus : state => state.wrongNetwork,
+  getWrongNetworkStatus : state => state.wrongNetwork,
   getTokensInfo : state => state.tokensInfo,
   getAllTransactions : state => state.allTransactions
 }
