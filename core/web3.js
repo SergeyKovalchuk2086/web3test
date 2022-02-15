@@ -4,7 +4,7 @@ import Web4 from '@cryptonteam/web4';
 import BigNumber from 'bignumber.js';
 const { ERC20 } = require('./abis.js');
 
-let web4 = new Web4();
+let web4;
 export let web3Wallet;
 export let userAddress;
 let chainId;
@@ -32,7 +32,13 @@ export const connectWallet = async () => {
       console.log('current project work on rinkeby network')
       return false;
     }
-    return true;
+    web4 = new Web4();
+    await web4.setProvider(ethereum, userAddress)
+    ercAbstract = web4.getContractAbstraction(ERC20);
+
+
+    return chainId;
+    // return true;
   } catch (err) {
     console.log(err);
     return false;
@@ -59,10 +65,6 @@ export const connectNode = () => {
 export const fetchContractData = async (method, ERC20, address, params) => {
   try {
     const contract = new web3Guest.eth.Contract(ERC20, address)
-    // console.log('contract', contract.methods)
-    // console.log('userAddress',userAddress);
-    //const balance = await contract.methods.balanceOf(userAddress).call();
-    //console.log('balance', balance)
     return await contract.methods[method].apply(this, params).call()
   } catch (e) {
     console.log(e)
@@ -70,53 +72,45 @@ export const fetchContractData = async (method, ERC20, address, params) => {
   }
 }
 
-//получить баланс по токену
-// export const balanceOfToken = async (token) => {
-  // const decimals = await fetchContractData('decimals', ERC20, token)
-  // console.log(decimals)
-  // let balance = await fetchContractData('balanceOf', ERC20, token, [userAddress])
-  // console.log(balance)
-  // balance = new BigNumber(balance).shiftedBy(-decimals).toString()
-  // console.log('Баланс: ', balance)
-// }
-
 //символ токенов
 export const symbolOfToken = async (token) => {
   const symbol = await fetchContractData('symbol', ERC20, token);
-  console.log(symbol)
   return symbol;
 }
 
 //transfer token
 export const transferToken = async (token, recipient, amount) => {
-  // web4 = new Web4();
-  const { ethereum } = window;
-  await web4.setProvider(ethereum, userAddress)
-  ercAbstract = web4.getContractAbstraction(ERC20);
-  instance = await ercAbstract.getInstance(token);
 
+  instance = await ercAbstract.getInstance(token);
   return await instance.transfer(recipient, amount)
 }
 
 //approve token
 export const approveToken = async (token, recipient, amount) => {
-  const { ethereum } = window;
-  await web4.setProvider(ethereum, userAddress)
-  ercAbstract = web4.getContractAbstraction(ERC20);
-  instance = await ercAbstract.getInstance(token);
 
+  instance = await ercAbstract.getInstance(token);
   return await instance.approve(recipient, amount)
 }
 
 //allowance token
 export const allowanceToken = async (user, recipient, token) => {
-  const { ethereum } = window;
-  await web4.setProvider(ethereum, userAddress)
-  ercAbstract = web4.getContractAbstraction(ERC20);
-  instance = await ercAbstract.getInstance(token);
 
+  instance = await ercAbstract.getInstance(token);
   await instance.allowance(user, recipient)
 }
+
+//get transactions
+export const getTransaction = async (token, fn) => {
+
+  instance = await ercAbstract.getInstance(token);
+  await instance.contract.events.Transfer({
+    fromBlock: 0,
+    filter: {
+      from: userAddress
+    }
+  }, (e, r) => fn(r) )
+}
+
 
 
 

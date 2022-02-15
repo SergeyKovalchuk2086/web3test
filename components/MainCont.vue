@@ -10,7 +10,7 @@
         </button>
       </div>
       <div class="header__network">
-        {{ network}}
+        {{ currentNetwork}}
       </div>
     </header>
 
@@ -30,7 +30,7 @@
           </div>
           <div class="amount__select">
             <select name="" id="" class="amount__select-list" v-model="selectedSymbol">
-              <option v-for="token in tokensInfo" :key="token.symbol" v-bind:value="token"> {{ token.symbol}} </option>
+              <option v-for="token in tokensInfo" :key="token.token" v-bind:value="token"> {{ token.symbol}} </option>
             </select>
           </div>
         </div>
@@ -58,22 +58,22 @@
         </div>
 
         <div class="buttons">
-          <button class="buttons__allow btn"  :disabled='invalid' @click="allowance(selectedSymbol.symbol)">
+          <button class="buttons__allow btn"  @click="allowance(selectedSymbol)">
             Get allowance
           </button>
 
-          <button class="buttons__approve btn" :disabled='invalid' @click="approve(selectedSymbol.symbol)">
+          <button class="buttons__approve btn" :disabled='invalid' @click="approve(selectedSymbol)">
             Approve
           </button>
 
-          <button class="buttons__transfer btn" :disabled='invalid' @click="transfer(selectedSymbol.symbol)">
+          <button class="buttons__transfer btn" :disabled='invalid' @click="transfer(selectedSymbol)">
             Transfer
           </button>
         </div>
       </ValidationObserver>
 
       <Transactions />
-      <wrong-network  v-if="wrongNetworkWallet" @close-modal="closeModal"/>
+      <wrong-network  v-if="wrongNetworkInWallet" @close-modal="closeModal"/>
     </main>
   </div>
 </template>
@@ -83,10 +83,10 @@ import Transactions from "./Transactions";
 import {
   connectNode,
   fetchContractData,
-  connectWallet,
   userAddress,
   transferToken,
   approveToken,
+  getTransaction
 } from "../core/web3";
 import BigNumber from "bignumber.js";
 import WrongNetwork from "../modals/WrongNetwork";
@@ -98,159 +98,86 @@ export default {
   components: {WrongNetwork, Transactions},
   data() {
     return {
-      tokens: [
-        '0x4b107a23361770534bd1839171bbf4b0eb56485c',
-        '0xc13da4146d381c7032ca1ed6050024b4e324f4ef',
-        '0x8d0c36c8842d1dc9e49fbd31b81623c1902b7819',
-        '0xa364f66f40b8117bbdb772c13ca6a3d36fe95b13',
-      ],
-      tokensInfo: [],
       selectedSymbol: '',
       tokenAllowance: null,
       amountToken: null,
       recipientAddress: '',
       connected: null,
-      transaction: {},
-      network: '',
-      wrongNetworkWallet: false
+      allTransactions: []
     }
-  },
-  computed: {
-
   },
   watch: {
     connected(value){
-      if(value) this.getAllBalance();
+      if(value) this.getAllTransactions();
+    },
+    selectedSymbol(value){
+      this.getAllTransactions(value)
+    }
+  },
+  computed: {
+    currentNetwork(){
+      return this.$store.getters.getCurrentNetwork
+    },
+    wrongNetworkInWallet(){
+      return this.$store.getters.wrongNetworkStatus
+    },
+    tokensInfo(){
+      return this.$store.getters.getTokensInfo
     }
   },
   methods: {
     //подключить кошелек
-    async connect(){
-      this.connected = await connectWallet()
-      if (this.connected){
-        this.$store.commit('setStatusWallet', this.connected)
-        this.network = 'Rinkeby'
-      } else {
-        this.network = 'Mainnet'
-        this.wrongNetworkWallet = true;
-      }
-
-
-      // console.log('connect')
-      // console.log(this.connected)
-      // console.log(this.$store.getters['getStatusWallet']);
+    connect(){
+      this.$store.dispatch('CONNECT_WALLET')
     },
     disconnect(){
       this.connected = !this.connected
-      // console.log('disconnect')
-    },
-
-    //получение всех балансов
-    async getAllBalance(){
-       let symbolOfToken;
-       let decimals;
-       let balance;
-
-      //перебор токенов
-      for (const token of this.tokens) {
-        //символ токена
-        symbolOfToken = await fetchContractData('symbol', ERC20, token);
-        // console.log('symbol', symbolOfToken)
-
-        // точность
-        decimals = await fetchContractData('decimals', ERC20, token)
-        // console.log(decimals)
-
-        // баланс
-        balance = await fetchContractData('balanceOf', ERC20, token, [userAddress])
-        balance = new BigNumber(balance).shiftedBy(-decimals).toString()
-        // console.log(balance)
-
-        const tokenInfo = {
-          token: token,
-          symbol: symbolOfToken,
-          balance: balance
-        }
-        this.tokensInfo.push(tokenInfo);
-      }
     },
 
     //transfer token
     async transfer(selectedSymbol){
-      let decimal;
       let amount;
-      for (const token of this.tokensInfo) {
-        if(token.symbol === selectedSymbol) {
-          decimal = await fetchContractData('decimals', ERC20, token.token);
-          amount = new BigNumber(this.amountToken).shiftedBy(+decimal).toString();
 
-          // console.log(typeof this.recipientAddress)
-          const res = await transferToken(token.token, this.recipientAddress, amount )
-          // console.log(res)
-
-          //ждём конец транзакции
-          if(res.receipt.status) {
-            this.transaction = {
-              type: 'Transfer',
-              from: `${userAddress}`,
-              to: `${this.recipientAddress}`,
-              amount: this.amountToken,
-              tokenSymbol: this.selectedSymbol.symbol
-            }
-            this.$store.commit('setTransaction', this.transaction)
-          }
-        }
-      }
+      amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString();
+      await transferToken(selectedSymbol.token, this.recipientAddress, amount )
     },
-
 
     //approve
     async approve(selectedSymbol){
-      let decimal;
       let amount;
-      for (const token of this.tokensInfo) {
-        if(token.symbol === selectedSymbol) {
-          decimal = await fetchContractData('decimals', ERC20, token.token);
-          amount = new BigNumber(this.amountToken).shiftedBy(+decimal).toString();
 
-          let res = await approveToken(token.token, this.recipientAddress, amount )
-
-          if(res.receipt.status) {
-            this.transaction = {
-              type: 'Approve',
-              from: `${userAddress}`,
-              to: `${this.recipientAddress}`,
-              amount: this.amountToken,
-              tokenSymbol: this.selectedSymbol.symbol
-            }
-            this.$store.commit('setTransaction', this.transaction)
-          }
-        }
-      }
+      amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString();
+      await approveToken(selectedSymbol.token, this.recipientAddress, amount )
     },
 
     //allowance
     async allowance(selectedSymbol){
       let allowance;
-      let decimals;
-      for (const token of this.tokensInfo) {
-        if (token.symbol === selectedSymbol) {
-          allowance = await fetchContractData('allowance', ERC20, token.token, [userAddress, this.recipientAddress]);
-          decimals = await fetchContractData('decimals', ERC20, token.token)
 
-          this.tokenAllowance = new BigNumber(allowance).shiftedBy(-decimals).toString()
-          // console.log(allowance)
-        }
-      }
+      allowance = await fetchContractData('allowance', ERC20, selectedSymbol.token, [userAddress, this.recipientAddress]);
+      this.tokenAllowance = new BigNumber(allowance).shiftedBy(-selectedSymbol.decimal).toString()
     },
     closeModal() {
       this.wrongNetworkWallet = !this.wrongNetworkWallet
-    }
+    },
+
+    //all transactions
+    getAllTransactions(value){
+
+      const _this = this
+      _this.$store.dispatch('CLEAR_TRANSACTIONS')
+
+       getTransaction(value.token,  function(trans){
+         _this.$store.dispatch('SET_TRANSACTIONS',  trans)
+      });
+    },
+
   },
   mounted() {
     connectNode();
   },
 }
+
 </script>
 
 <style lang="scss" scoped>
