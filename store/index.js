@@ -8,7 +8,8 @@ export const state = () => ({
   currentNetwork: '',
   wrongNetwork: false,
   tokensInfo: [],
-  allTransactions: []
+  allTransactions: [],
+  loader: false
 })
 
 export const mutations = {
@@ -26,6 +27,9 @@ export const mutations = {
   },
   CLEAR_TRANSACTIONS(state){
     state.allTransactions = []
+  },
+  START_LOADER(state, status) {
+    state.loader = status
   }
 }
 
@@ -43,26 +47,8 @@ export const actions = {
   async getAllInfoAboutToken({commit, state}) {
     try {
       let arrayInfo = []
-      // const [
-      //   symbolOfToken,
-      //   decimals
-      // ] = await Promise.all([
-      //   fetchContractData('symbol', ERC20, token),
-      //   await fetchContractData('decimals', ERC20, token)
-      // ])
-      //перебор токенов
+      //перебор токенов для получение инфы
       for (const token of tokens) {
-
-        //символ токена
-        // const symbolOfToken = await fetchContractData('symbol', ERC20, token);
-
-        // точность
-        // const decimals = await fetchContractData('decimals', ERC20, token)
-
-        // баланс
-        // let balance = await fetchContractData('balanceOf', ERC20, token, [userAddress])
-        // balance = new BigNumber(balance).shiftedBy(-decimals).toString()
-
         const [
           symbolOfToken,
           decimals
@@ -74,7 +60,6 @@ export const actions = {
         const tokenInfo = {
           token: token,
           symbol: symbolOfToken,
-          // balance: balance,
           decimal: decimals
         }
         arrayInfo.push(tokenInfo);
@@ -83,13 +68,15 @@ export const actions = {
     } catch (err) {
       console.log('Get token info error')
     }
-
   },
   setTransactions({commit}, transArr) {
     commit('SET_TRANSACTIONS', transArr)
   },
   clearTransactions({commit}){
     commit('CLEAR_TRANSACTIONS')
+  },
+  startLoader({commit}, status){
+    commit('START_LOADER', status)
   }
 }
 
@@ -97,5 +84,6 @@ export const getters = {
   getCurrentNetwork : state => state.currentNetwork,
   getWrongNetworkStatus : state => state.wrongNetwork,
   getTokensInfo : state => state.tokensInfo,
-  getAllTransactions : state => state.allTransactions
+  getAllTransactions : state => state.allTransactions,
+  getLoader : state => state.loader
 }

@@ -19,7 +19,7 @@
             <ValidationProvider
               v-slot="{ errors }"
               :name="'Amount'"
-              :rules="`required|integer|max_value:${selectedSymbol.balance}|min_value:1`"
+              :rules="`required|integer|max_value:${balanceToken}|min_value:1`"
             >
               <input type="text" id="amount" class="amount__input" v-model="amountToken">
               <span class="amount__error">{{errors[0]}}</span>
@@ -63,6 +63,7 @@
         </div>
       </ValidationObserver>
       <Transactions />
+      <UiLoader v-if="isPending"/>
       <wrong-network  v-if="wrongNetworkInWallet" @close-modal="closeModal"/>
     </main>
   </div>
@@ -71,6 +72,7 @@
 <script>
 import BigNumber from "bignumber.js";
 import Transactions from "./Transactions";
+import UiLoader from "./ui/loader";
 import WrongNetwork from "../modals/WrongNetwork";
 import {
   connectNode,
@@ -84,7 +86,7 @@ import {ERC20} from "../core/abis";
 
 export default {
   name: 'MainCont',
-  components: {WrongNetwork, Transactions},
+  components: {UiLoader, WrongNetwork, Transactions},
   data() {
     return {
       selectedSymbol: '',
@@ -94,7 +96,8 @@ export default {
       connected: null,
       allTransactions: [],
       isConnectedNode: false,
-      balanceToken: null
+      balanceToken: null,
+      pending: false
     }
   },
   watch: {
@@ -116,6 +119,9 @@ export default {
     tokensInfo(){
       return this.$store.getters.getTokensInfo
     },
+    isPending(){
+      return this.$store.getters.getLoader
+    }
   },
   methods: {
     //подключить кошелек
@@ -124,18 +130,37 @@ export default {
     },
     //transfer token
     async transfer(selectedSymbol){
-      const amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString()
-      await transferToken(selectedSymbol.token, this.recipientAddress, amount )
+      try {
+        const amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString()
+        //запуск loader
+        await this.$store.dispatch('startLoader', true)
+        await transferToken(selectedSymbol.token, this.recipientAddress, amount )
+        //убрать loader
+        await this.$store.dispatch('startLoader', false)
+        await this.balance(selectedSymbol)
+      } catch (err) {
+        console.log('Error transfer amount')
+      }
     },
     //approve
     async approve(selectedSymbol){
-      const amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString()
-      await approveToken(selectedSymbol.token, this.recipientAddress, amount )
+      try {
+        const amount = new BigNumber(this.amountToken).shiftedBy(+selectedSymbol.decimal).toString()
+        await this.$store.dispatch('startLoader', true)
+        await approveToken(selectedSymbol.token, this.recipientAddress, amount )
+        await this.$store.dispatch('startLoader', false)
+      } catch (err){
+        console.log('Error approve amount')
+      }
     },
     //allowance
     async allowance(selectedSymbol){
-      const allowance = await fetchContractData('allowance', ERC20, selectedSymbol.token, [userAddress, this.recipientAddress])
-      this.tokenAllowance = new BigNumber(allowance).shiftedBy(-selectedSymbol.decimal).toString()
+      try {
+        const allowance = await fetchContractData('allowance', ERC20, selectedSymbol.token, [userAddress, this.recipientAddress])
+        this.tokenAllowance = new BigNumber(allowance).shiftedBy(-selectedSymbol.decimal).toString()
+      } catch (err) {
+        console.log('Error get allowance')
+      }
     },
     //закрыть модалку
     closeModal() {

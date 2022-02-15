@@ -70,28 +70,24 @@ export const fetchContractData = async (method, ERC20, address, params) => {
 
 //transfer token
 export const transferToken = async (token, recipient, amount) => {
-
   instance = await ercAbstract.getInstance(token);
   return await instance.transfer(recipient, amount)
 }
 
 //approve token
 export const approveToken = async (token, recipient, amount) => {
-
   instance = await ercAbstract.getInstance(token);
   return await instance.approve(recipient, amount)
 }
 
 //allowance token
 export const allowanceToken = async (user, recipient, token) => {
-
   instance = await ercAbstract.getInstance(token);
   await instance.allowance(user, recipient)
 }
 
 //get transactions
 export const getTransaction = async (token, fn) => {
-
   instance = await ercAbstract.getInstance(token);
   await instance.contract.events.Transfer({
     fromBlock: 0,
